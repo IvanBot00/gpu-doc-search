@@ -18,14 +18,15 @@ int main (int argc, char *argv[])
     unsigned numDocs, numWords;
 
     if (argc == 1) {
-	numDocs = 128;
+	numDocs = 1000;
 	numWords = 1000;
     } else if (argc == 2) {
-	numDocs = atoi(argv[2]);
-	numWords = atoi(argv[2]);
+	numDocs = atoi(argv[1]);
+	numWords = atoi(argv[1]);
+	printf("%u", numDocs);
     } else if (argc == 3) {
-	numWords = atoi(argv[2]);
-	numDocs = atoi(argv[3]);
+	numWords = atoi(argv[1]);
+	numDocs = atoi(argv[2]);
     } else if (argc == 4) {
 	printf("File read not implemented yet\n");
     } else {
@@ -62,6 +63,7 @@ int main (int argc, char *argv[])
     printf("Copying data from host to device..."); fflush(stdout);
 
    // cudaMemcpy(tf_d, tf_h, tf_sz * sizeof(unsigned), cudaMemcpyHostToDevice);
+    cudaMemset(df_d, 0, numWords * sizeof(unsigned));
     cudaMemcpy(scores_d, scores_h, scores_sz * sizeof(float), cudaMemcpyHostToDevice);
 
     cudaDeviceSynchronize();
@@ -73,7 +75,7 @@ int main (int argc, char *argv[])
     cuda_ret = cudaDeviceSynchronize();
     if(cuda_ret != cudaSuccess) printf("Unable to launch kernel");
 
-    calculateBM25(scores_d, tf_d, numWords, numDocs);
+    calculateBM25(scores_d, tf_d, df_d, numWords, numDocs);
 
     cuda_ret = cudaDeviceSynchronize();
     if(cuda_ret != cudaSuccess) printf("Unable to launch kernel");
@@ -92,7 +94,7 @@ int main (int argc, char *argv[])
     printf("Verifying Results..."); fflush(stdout);
 
     verify_df(df_h, tf_h, numWords, numDocs);
-    //verify_bm25(scores_h, tf_h, numWords, numDocs);
+    verify_bm25(scores_h, tf_h, df_h, numWords, numDocs);
 
 
     // Free memory

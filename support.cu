@@ -20,43 +20,45 @@ void verify_df(const unsigned *gpuResult, const unsigned *tf, unsigned int numWo
 	}
     }
 
-
     for (unsigned i = 0; i < numWords; ++i) {
-	printf("CPU: %u, GPU: %u\n", cpuResult[i], gpuResult[i]);
+	//printf("CPU: %u, GPU: %u\n", cpuResult[i], gpuResult[i]);
 	if (gpuResult[i] != cpuResult[i]) {
-	    printf("\nTEST FAILED %d\n", i);
+	    printf("\nDF TEST FAILED %d\n", i);
 	    printf("CPU: %u, GPU: %u\n", cpuResult[i], gpuResult[i]);
 	    exit(1);
 	}
     }
 
-    printf("\n DF TEST PASSED\n");
+    printf("\nDF TEST PASSED\n");
 
     free(cpuResult);
 }
 
-void verify_bm25(const float *gpuResult, const unsigned *tf, unsigned int numWords, unsigned int numDocs) {
+void verify_bm25(const float *gpuResult, const unsigned *tf, const unsigned *df, unsigned int numWords, unsigned int numDocs) {
 
     float *cpuResult;
     cpuResult = (float*)malloc(numDocs * sizeof(float));
     for (unsigned i = 0; i < numDocs; ++i) { cpuResult[i] = 0.0; }
 
+    unsigned doctf, docf;
+
     for (unsigned Row = 0; Row < numWords; ++Row) {
 	for (unsigned Col = 0; Col < numDocs; ++Col) {
- 	    float doctf = tf[Row * numDocs + Col];
-	    cpuResult[Col] += log((numDocs - 10 + 0.5) / (10 + 0.5)) * (2.2 * doctf / (K + doctf));    
+            doctf = tf[Row * numDocs + Col];
+	    docf = df[Row];
+	    cpuResult[Col] += log((numDocs - docf + 0.5) / (docf + 0.5)) * (2.2 * doctf / (K + doctf)); 
 	}
     }
 
     for (unsigned i = 0; i < numDocs; ++i) {
 	if (!isEqual(cpuResult[i], gpuResult[i])) {
-	    printf("\nTEST FAILED %d\n", i);
+	    printf("\nBM25 TEST FAILED %d\n", i);
 	    printf("CPU: %f, GPU: %f\n", cpuResult[i], gpuResult[i]);
 	    exit(1);
 	}
     }
 
-    printf("\nTEST PASSED\n");
+    printf("\nBM25 TEST PASSED\n");
     
     free(cpuResult);
 }

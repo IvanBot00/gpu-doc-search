@@ -1,41 +1,33 @@
 #include <stdio.h>
 #include "defines.h"
 
-
 __global__ void docFrequencyKernel(unsigned *output, unsigned *input, unsigned numDocs) {
 
     __shared__ unsigned private_df;
 
     int t = threadIdx.x;
-
-    if (t == 0)
-	private_df = 0;
-
-    //__syncthreads;
+	
+    private_df = 0;
 
     int i = t + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
 
     while (i < numDocs) {
-	if (input[i] > 0) // maybe check if within bounds?
+	if (input[i] > 0)
 	    atomicAdd(&private_df, 1);
 	i += stride;
     }
 
-   // __syncthreads;
+    __syncthreads;
 
-    if (threadIdx.x == 0) {
+    if (t == 0) {
 	atomicAdd(output, private_df);
     }
 }
 
-
 void calculateDocFrequency(unsigned *df_d, unsigned *tf_d, const unsigned *tf_h, const unsigned numWords, const unsigned numDocs) {
     
-    int BLOCK_SIZE = 256;
-    
-    dim3 dimGrid((numDocs - 1) / BLOCK_SIZE + 1, 1 , 1);
-    dim3 dimBlock(BLOCK_SIZE, 1, 1);
+    int BLOCK_SIZE = 512;
 
     cudaStream_t stream0;
     cudaStream_t stream1;
@@ -58,16 +50,21 @@ void calculateDocFrequency(unsigned *df_d, unsigned *tf_d, const unsigned *tf_h,
     }
 }
 
-__global__ void bm25Kernel(float *output, const unsigned *tf, const unsigned numWords, const unsigned numDocs) {
+__global__ void bm25Kernel(float *output, const unsigned *tf, const unsigned *df, const unsigned numWords, const unsigned numDocs) {
 
     unsigned Col = blockDim.x * blockIdx.x + threadIdx.x;
 
     float docScore = 0.0;
 
+    unsigned docf, doctf;
+
     for (int Row = 0; Row < numWords; ++Row) {
-	int df = 10; //docFrequency(tf, Row, numDocs);
-	int doctf = tf[Row * numDocs + Col];
-	docScore += logf((numDocs - df + 0.5) / (df + 0.5)) * ((K_1 + 1) * doctf / (K + doctf));	
+	//df = 10; //docFrequency(tf, Row, numDocs);
+	if (Row < numWords && Col < numDocs) {
+	    docf = df[Row];
+	    doctf = tf[Row * numDocs + Col];
+	    docScore += logf((numDocs - docf + 0.5) / (docf + 0.5)) * ((K_1 + 1) * doctf / (K + doctf));
+	}
     } 
 
     __syncthreads;
@@ -77,14 +74,14 @@ __global__ void bm25Kernel(float *output, const unsigned *tf, const unsigned num
     }
 }
 
-void calculateBM25(float *output, const unsigned *tf, const unsigned numWords, const unsigned numDocs) {
+void calculateBM25(float *output, const unsigned *tf, const unsigned *df, const unsigned numWords, const unsigned numDocs) {
 
     int BLOCK_SIZE = 512;
 
     dim3 dimGrid((numDocs - 1) / BLOCK_SIZE + 1, 1, 1);
     dim3 dimBlock(BLOCK_SIZE, 1, 1);
 
-    bm25Kernel<<<dimGrid, dimBlock>>>(output, tf, numWords, numDocs);
+    bm25Kernel<<<dimGrid, dimBlock>>>(output, tf, df, numWords, numDocs);
 }
 /*
 __device__ float dotProduct(float *a, float *b, int size) {
