@@ -1,34 +1,63 @@
 #include <stdio.h>
 #include "defines.h"
 
-/*
-__device__ float magnitude() {
 
-}
+__global__ void docFrequencyKernel(unsigned *output, unsigned *input, unsigned numDocs) {
 
-__global__ void vectorSpaceKernel() {
-    // calculate cosine (tf[row][col] * query[row]
+    __shared__ unsigned private_df;
+
+    int t = threadIdx.x;
+
+    if (t == 0)
+	private_df = 0;
+
+    //__syncthreads;
+
+    int i = t + blockIdx.x * blockDim.x;
+    int stride = blockDim.x * gridDim.x;
+
+    while (i < numDocs) {
+	if (input[i] > 0) // maybe check if within bounds?
+	    atomicAdd(&private_df, 1);
+	i += stride;
+    }
 
    // __syncthreads;
 
-   // calculate magnitude of query
-
-   // calculate magnitude of doc horizontal memory access :( (opportunity for dynamic paralleism)
-
-    // calculate product of magntidues
-
-    // divide result by product
+    if (threadIdx.x == 0) {
+	atomicAdd(output, private_df);
+    }
 }
 
-void calculateVectorSpace() {
 
-}
-*/
-/*
-__device__ int docFrequency() {
+void calculateDocFrequency(unsigned *df_d, unsigned *tf_d, const unsigned *tf_h, const unsigned numWords, const unsigned numDocs) {
+    
+    int BLOCK_SIZE = 256;
+    
+    dim3 dimGrid((numDocs - 1) / BLOCK_SIZE + 1, 1 , 1);
+    dim3 dimBlock(BLOCK_SIZE, 1, 1);
 
+    cudaStream_t stream0;
+    cudaStream_t stream1;
+    cudaStreamCreate(&stream0);
+    cudaStreamCreate(&stream1);
+
+    size_t rowSize = numDocs * sizeof(unsigned);
+
+    unsigned *doc0, *doc1;
+
+    for (unsigned i = 0; i < numWords; i += 2) {
+	doc0 = tf_d + (i * numDocs);
+	doc1 = tf_d + ((i+1) * numDocs);
+
+	cudaMemcpyAsync(doc0, tf_h + i * numDocs, rowSize, cudaMemcpyHostToDevice, stream0);
+	cudaMemcpyAsync(doc1, tf_h + (i + 1) * numDocs, rowSize, cudaMemcpyHostToDevice, stream1);
+
+	docFrequencyKernel<<<2, BLOCK_SIZE, 0, stream0>>>(&df_d[i], doc0, numDocs);
+	docFrequencyKernel<<<2, BLOCK_SIZE, 0, stream1>>>(&df_d[i+1], doc1, numDocs);
+    }
 }
-*/
+
 __global__ void bm25Kernel(float *output, const unsigned *tf, const unsigned numWords, const unsigned numDocs) {
 
     unsigned Col = blockDim.x * blockIdx.x + threadIdx.x;
