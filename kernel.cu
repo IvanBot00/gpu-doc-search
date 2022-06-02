@@ -20,12 +20,11 @@ __global__ void docFrequencyKernel(unsigned *output, const unsigned *input, cons
     for (int Row = 0; Row < numWords; ++Row) {
 	i = threadIdx.x + blockIdx.x * blockDim.x;
 	while (i < numDocs) {
-	    if (input[Row * numWords + i] > 0) {
+	    if (input[Row * numDocs + i] > 0) {
 		atomicAdd(&(private_df[Row]), 1);
 	    }
 	    i += stride;
 	}
-	__syncthreads();
     }
 
     __syncthreads();
@@ -34,7 +33,6 @@ __global__ void docFrequencyKernel(unsigned *output, const unsigned *input, cons
 
     i = t;
     while(i < numWords) {
-	//printf("%u\n", private_df[i]);
 	atomicAdd(&(output[i]), private_df[i]);
 	i += stride;
     }    
@@ -109,7 +107,6 @@ __global__ void bm25Kernel(float *output, const unsigned *tf, const unsigned *df
     unsigned docf, doctf;
 
     for (int Row = 0; Row < numWords; ++Row) {
-	//df = 10; //docFrequency(tf, Row, numDocs);
 	if (Row < numWords && Col < numDocs) {
 	    docf = df[Row];
 	    doctf = tf[Row * numDocs + Col];
@@ -117,7 +114,7 @@ __global__ void bm25Kernel(float *output, const unsigned *tf, const unsigned *df
 	}
     } 
 
-    __syncthreads;
+    //__syncthreads;
 
     if (Col < numDocs) {
 	output[Col] = docScore;
