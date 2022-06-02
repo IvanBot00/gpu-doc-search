@@ -20,6 +20,15 @@ void verify_df(const unsigned *gpuResult, const unsigned *tf, unsigned int numWo
 	}
     }
 
+/*
+    for (unsigned i = 0; i < numWords; ++i) {
+	for (unsigned j = 0; j < numDocs; ++j) {
+	    printf(" %u ", tf[i * numWords + j]);
+        }
+        printf("\n");
+    }
+*/
+
     for (unsigned i = 0; i < numWords; ++i) {
 	//printf("CPU: %u, GPU: %u\n", cpuResult[i], gpuResult[i]);
 	if (gpuResult[i] != cpuResult[i]) {
@@ -29,7 +38,7 @@ void verify_df(const unsigned *gpuResult, const unsigned *tf, unsigned int numWo
 	}
     }
 
-    printf("\nDF TEST PASSED\n");
+    //printf("\nDF TEST PASSED\n");
 
     free(cpuResult);
 }
@@ -58,7 +67,20 @@ void verify_bm25(const float *gpuResult, const unsigned *tf, const unsigned *df,
 	}
     }
 
-    printf("\nBM25 TEST PASSED\n");
+    //printf("\nBM25 TEST PASSED\n");
     
     free(cpuResult);
+}
+
+void startTime(Timer* timer) {
+    gettimeofday(&(timer->startTime), NULL);
+}
+
+void stopTime(Timer* timer) {
+    gettimeofday(&(timer->endTime), NULL);
+}
+
+float elapsedTime(Timer timer) {
+    return ((float) ((timer.endTime.tv_sec - timer.startTime.tv_sec) \
+		+ (timer.endTime.tv_usec - timer.startTime.tv_usec)/1.0e6));
 }

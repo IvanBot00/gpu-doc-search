@@ -7,6 +7,11 @@
 
 int main (int argc, char *argv[])
 {
+    Timer timer;
+
+    printf("\nSetting up the problem..."); fflush(stdout);
+    startTime(&timer);
+
     cudaError_t cuda_ret;
 
     srand(time(NULL));
@@ -18,8 +23,8 @@ int main (int argc, char *argv[])
     unsigned numDocs, numWords;
 
     if (argc == 1) {
-	numDocs = 1000;
-	numWords = 1000;
+	numDocs = 10;
+	numWords = 10;
     } else if (argc == 2) {
 	numDocs = atoi(argv[1]);
 	numWords = atoi(argv[1]);
@@ -49,28 +54,37 @@ int main (int argc, char *argv[])
     scores_h = (float*) malloc(sizeof(float) * scores_sz);
     for (unsigned int i=0; i < scores_sz; ++i) { scores_h[i] = 0; }
 
+    stopTime(&timer); printf("%f s\n", elapsedTime(timer));
 	
     // Allocate device variables
     printf("Allocating device variables..."); fflush(stdout);
+    startTime(&timer);
     
     cudaMalloc((void**) &tf_d, sizeof(unsigned) * tf_sz);
     cudaMalloc((void**) &scores_d, sizeof(float) * scores_sz);
     cudaMalloc((void**) &df_d, sizeof(unsigned) * df_sz);
 
     cudaDeviceSynchronize();
+    stopTime(&timer); printf("%f s\n", elapsedTime(timer));
 
     // Copy host variables to device
     printf("Copying data from host to device..."); fflush(stdout);
+    startTime(&timer);
 
-   // cudaMemcpy(tf_d, tf_h, tf_sz * sizeof(unsigned), cudaMemcpyHostToDevice);
+    cudaMemcpy(tf_d, tf_h, tf_sz * sizeof(unsigned), cudaMemcpyHostToDevice);
     cudaMemset(df_d, 0, numWords * sizeof(unsigned));
     cudaMemcpy(scores_d, scores_h, scores_sz * sizeof(float), cudaMemcpyHostToDevice);
 
     cudaDeviceSynchronize();
+    stopTime(&timer); printf("%f s\n", elapsedTime(timer));
 
     // Launch Kernels ----------
+    
+    printf("Launching kernels..."); fflush(stdout);
+    startTime(&timer);
 
-    calculateDocFrequency(df_d, tf_d, tf_h, numWords, numDocs);
+    //calculateDocFrequency(df_d, tf_d, tf_h, numWords, numDocs);
+    calculateDocFrequency(df_d, tf_d, numWords, numDocs);
 
     cuda_ret = cudaDeviceSynchronize();
     if(cuda_ret != cudaSuccess) printf("Unable to launch kernel");
@@ -80,22 +94,30 @@ int main (int argc, char *argv[])
     cuda_ret = cudaDeviceSynchronize();
     if(cuda_ret != cudaSuccess) printf("Unable to launch kernel");
 
+    stopTime(&timer); printf("%f s\n", elapsedTime(timer));
+
     // -------------------------
-    
     // Copy device variables to host
+
+    printf("Copying data from device to host..."); fflush(stdout);
+    startTime(&timer);
 
     cudaMemcpy(scores_h, scores_d, scores_sz * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(df_h, df_d, df_sz * sizeof(unsigned), cudaMemcpyDeviceToHost);
 
     cudaDeviceSynchronize();
+    stopTime(&timer); printf("%f s\n", elapsedTime(timer));
 
     // Verify results
 
     printf("Verifying Results..."); fflush(stdout);
 
+    startTime(&timer);
+
     verify_df(df_h, tf_h, numWords, numDocs);
     verify_bm25(scores_h, tf_h, df_h, numWords, numDocs);
 
+    stopTime(&timer); printf("%f s\n", elapsedTime(timer));
 
     // Free memory
     free(tf_h);

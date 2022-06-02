@@ -1,6 +1,55 @@
 #include <stdio.h>
 #include "defines.h"
 
+__global__ void docFrequencyKernel(unsigned *output, const unsigned *input, const unsigned numWords, const unsigned numDocs) {
+    
+    __shared__ unsigned private_df[4096];
+
+    int t = threadIdx.x;
+    int stride = blockDim.x;
+
+    int i = t;
+    while (i < numWords) {
+	private_df[i] = 0;
+	i += stride;
+    }
+
+    //__syncthreads;
+    stride = blockDim.x * gridDim.x;
+
+    for (int Row = 0; Row < numWords; ++Row) {
+	i = threadIdx.x + blockIdx.x * blockDim.x;
+	while (i < numDocs) {
+	    if (input[Row * numWords + i] > 0) {
+		atomicAdd(&(private_df[Row]), 1);
+	    }
+	    i += stride;
+	}
+	__syncthreads();
+    }
+
+    __syncthreads();
+
+    stride = blockDim.x;
+
+    i = t;
+    while(i < numWords) {
+	//printf("%u\n", private_df[i]);
+	atomicAdd(&(output[i]), private_df[i]);
+	i += stride;
+    }    
+}
+
+void calculateDocFrequency(unsigned *df_d, unsigned *tf_d, unsigned numWords, unsigned numDocs) {
+    int BLOCK_SIZE = 512;
+ 
+    dim3 DimGrid(2, 1, 1);
+    dim3 DimBlock(BLOCK_SIZE, 1, 1);
+
+    docFrequencyKernel<<<DimGrid, DimBlock>>>(df_d, tf_d, numWords, numDocs);
+}
+
+/*
 __global__ void docFrequencyKernel(unsigned *output, unsigned *input, unsigned numDocs) {
 
     __shared__ unsigned private_df;
@@ -49,6 +98,7 @@ void calculateDocFrequency(unsigned *df_d, unsigned *tf_d, const unsigned *tf_h,
 	docFrequencyKernel<<<2, BLOCK_SIZE, 0, stream1>>>(&df_d[i+1], doc1, numDocs);
     }
 }
+*/
 
 __global__ void bm25Kernel(float *output, const unsigned *tf, const unsigned *df, const unsigned numWords, const unsigned numDocs) {
 
