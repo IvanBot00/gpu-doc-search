@@ -1,5 +1,7 @@
 # GPU Accelerated Document Search
 
+Check Report.pdf for pdf format of documentation.
+
 Presentation Link: https://youtu.be/OP4RmDrzMxU
 
 # Overview
